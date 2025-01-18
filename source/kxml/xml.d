@@ -364,7 +364,7 @@ class XmlNode
 		auto s = "<" ~ _name ~ genAttrString();
 
 		if (_children.length == 0)
-			s ~= " /"; // We want <blah /> if the node has no children.
+			s ~= "/"; // We want <blah/> if the node has no children.
 		s ~= ">";
 
 		return s;
