@@ -191,6 +191,36 @@ class XmlNode
 		_name = name;
 	}
 
+	/// Clone the state of an XmlNode from another
+	XmlNode cloneNode(XmlNode node)
+	{
+		_docroot = node._docroot;
+		_name = node._name;
+		_attributes = node._attributes.dup;
+		removeChildren;
+		foreach(child; node._children)
+			addChild(child.duplicate);
+		return this;
+	}
+
+	/// Duplicate an XmlNode or derivatives
+	XmlNode duplicate()
+	{
+		if (auto ucdata = cast(UCData)this) {
+			return (new UCData).cloneUCData(ucdata);
+		} else if (auto cdata = cast(CData)this) {
+			return (new CData).cloneCData(cdata);
+		} else if (auto xmlPi = cast(XmlPI)this) {
+			return (new XmlPI).cloneXmlPI(xmlPi);
+		} else if (auto xmlComment = cast(XmlComment)this) {
+			return (new XmlComment).cloneXmlComment(xmlComment);
+		} else if (auto xmlDoc = cast(XmlDocument)this) {
+			return (new XmlDocument).cloneXmlDocument(xmlDoc);
+		} else {
+			return (new XmlNode).cloneNode(this);
+		}
+	}
+
 	/// Get the name of this XmlNode.
 	string getName() {
 		return _name;
@@ -1022,6 +1052,14 @@ class CData : XmlNode
 
 	this(){}
 
+	/// Clone the state of a CData from another
+	CData cloneCData(CData cdata)
+	{
+		_docroot = cdata._docroot;
+		_cdata = cdata._cdata;
+		return this;
+	}
+
 	/// Get CData string associated with this object.
 	/// Returns: Parsed Character Data with decoded XML entities
 	override string getCData() {
@@ -1114,6 +1152,12 @@ class CData : XmlNode
 
 /// A specialization of CData for <![CDATA[]]> nodes
 class UCData : CData {
+	/// Clone the state of a UCData from another
+	UCData cloneUCData(UCData ucdata)
+	{
+		return cast(UCData)(cast(CData)this).cloneCData(cast(CData)ucdata);
+	}
+
 	/// Get CData string associated with this object.
 	/// Returns: Unparsed Character Data
 	override string getCData() {
@@ -1149,6 +1193,15 @@ class XmlPI : XmlNode {
 	/// Override the constructor that takes a name so that it's accessible.
 	this(string name) {
 		super(name);
+	}
+
+	/// Clone the state of an XmlPI from another
+	XmlPI cloneXmlPI(XmlPI xmlPi)
+	{
+		_name = xmlPi._name;
+		_attributes = xmlPi._attributes.dup;
+		_docroot = xmlPi._docroot;
+		return this;
 	}
 
 	/// This node can't have children, and so can't have CData.
@@ -1220,6 +1273,14 @@ class XmlComment : XmlNode {
 	/// Should this throw an exception?
 	override string getCData() {
 		return null;
+	}
+
+	/// Clone the state of an XmlComment from another
+	XmlComment cloneXmlComment(XmlComment comment)
+	{
+		_comment = comment._comment;
+		_docroot = comment._docroot;
+		return this;
 	}
 
 	/// This function resets the node to a default state
@@ -1347,6 +1408,14 @@ class XmlDocument:XmlNode {
 		super();
 	}
 
+	/// Clone the state of an XmlDocument from another
+	XmlDocument cloneXmlDocument(XmlDocument document)
+	{
+		reset;
+		foreach(child; document._children)
+			addChild(child.duplicate);
+		return this;
+	}
 
 	/// This static opCall should be used when creating new XmlDocuments for use
 	static XmlDocument opCall(string constring,bool preserveWS = false) {
@@ -1626,6 +1695,14 @@ unittest {
 	searchlist = xml.parseXPath(`//td[.="Text 2.3"]`);
 	assert(searchlist.length == 1);
 
+	xmlstring = `<?xml version="1.0" encoding="UTF-8"?><root><empty/><elem val="42">Text <child prop="test">with child </child>` ~
+		` and more text.</elem><cdata><![CDATA[Some <CDATA> content.]]></cdata><!-- Comment within XML --></root>`;
+
+	logline("kxml.xml XmlNode.duplicate test\n");
+	xml = readDocument(xmlstring, true);
+	assert(xml.toString == xmlstring);
+	auto dupXml = xml.duplicate;
+	assert(dupXml.toString == xmlstring);
 }
 
 version(XML_main) {
