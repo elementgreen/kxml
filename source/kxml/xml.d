@@ -1249,11 +1249,7 @@ class XmlComment : XmlNode {
 
 	// internal function to generate opening tags
 	protected override string asOpenTag() {
-		if (_name.length == 0) {
-			return null;
-		}
-		auto s = "<!--" ~ _comment  ~ "-->";
-		return s;
+		return "<!--" ~ _comment  ~ "-->";
 	}
 
 	// internal function to generate closing tags
