@@ -178,6 +178,7 @@ class XmlNode
 	protected string _name;
 	protected string[string] _attributes;
 	protected XmlNode[]      _children;
+	protected XmlNode _parent;
 
 
 
@@ -198,6 +199,7 @@ class XmlNode
 		_name = node._name;
 		_attributes = node._attributes.dup;
 		removeChildren;
+		_parent = null;
 		foreach(child; node._children)
 			addChild(child.duplicate);
 		return this;
@@ -279,8 +281,16 @@ class XmlNode
 		return this;
 	}
 
+	/// Get the parent node (or null if root).
+	XmlNode getParent()
+	{
+		return _parent;
+	}
+
 	/// Add a child node.
 	XmlNode addChild(XmlNode newNode) {
+		if (newNode._parent) throw new Exception("Child already has a parent");
+		newNode._parent = this;
 		// let's bump things by increments of 10 to make them more efficient
 		if (_children.length+1%10==0) {
 			_children.length = _children.length + 10;
@@ -298,15 +308,16 @@ class XmlNode
 	}
 
 	/// Remove the child with the same reference as what was given.
-	/// Returns: The number of children removed.
+	/// Returns: The number of children removed (can only be 1 or 0).
 	size_t removeChild(XmlNode remove) {
 		size_t len = _children.length;
 		for (size_t i = 0;i<_children.length;i++) if (_children[i] is remove) {
 			// we matched it, so remove it
-			// don't return true yet, since we're removing all references to it, not just the first one
 			_children = _children[0..i]~_children[i+1..$];
+			remove._parent = null;
+			return 1;
 		}
-		return len - _children.length;
+		return 0;
 	}
 
 	/// Add a child Node of cdata (text).
@@ -352,6 +363,7 @@ class XmlNode
 		_children.length = 0;
 		_attributes = null;
 		_name = null;
+		_parent = null;
 		// put back in the pool of available XmlNode nodes if possible
 		if (_docroot) {
 			_docroot.xmlNodes.length = _docroot.xmlNodes.length + 1;
@@ -361,6 +373,9 @@ class XmlNode
 
 	/// This function removes all child nodes from the current node
 	XmlNode removeChildren() {
+		foreach(child;_children) {
+			child._parent = null;
+		}
 		_children.length = 0;
 		return this;
 	}
@@ -468,6 +483,9 @@ class XmlNode
 
 	/// Add array of nodes directly into this node as children.
 	void addChildren(XmlNode[]newChildren) {
+		foreach(child; newChildren) {
+			child._parent = this;
+		}
 		// let's bump things by increments of 10 to make them more efficient
 		if (_children.length+newChildren.length%10 < newChildren.length) {
 			_children.length = _children.length + 10;
@@ -1035,6 +1053,7 @@ class XmlNode
 	/// Index override for replacing children.
 	XmlNode opIndexAssign(XmlNode x,int childnum) {
 		if (childnum > _children.length) throw new Exception("Child element assignment is outside of array bounds");
+		if (x._parent) throw new Exception("Child already has a parent");
 		_children[childnum] = x;
 		return this;
 	}
@@ -1056,6 +1075,7 @@ class CData : XmlNode
 	CData cloneCData(CData cdata)
 	{
 		_docroot = cdata._docroot;
+		_parent = null;
 		_cdata = cdata._cdata;
 		return this;
 	}
@@ -1080,6 +1100,7 @@ class CData : XmlNode
 			_docroot.cdataNodes[$-1] = this;
 		}
 		_cdata = null;
+		_parent = null;
 	}
 
 	/// This outputs escaped XML entities for use on the network or in a document.
@@ -1178,6 +1199,7 @@ class UCData : CData {
 			_docroot.ucdataNodes[$-1] = this;
 		}
 		_cdata = null;
+		_parent = null;
 	}
 
 	/// This outputs escaped XML entities for use on the network or in a document.
@@ -1200,6 +1222,7 @@ class XmlPI : XmlNode {
 	{
 		_name = xmlPi._name;
 		_attributes = xmlPi._attributes.dup;
+		_parent = null;
 		_docroot = xmlPi._docroot;
 		return this;
 	}
@@ -1217,9 +1240,10 @@ class XmlPI : XmlNode {
 
 	/// This function resets the node to a default state
 	override void reset() {
-		// put back in the pool of available CData nodes if possible
+		// put back in the pool of available xmlPINodes if possible
 		_name = null;
 		_attributes = null;
+		_parent = null;
 		if (_docroot) {
 			_docroot.xmlPINodes.length = _docroot.xmlPINodes.length + 1;
 			_docroot.xmlPINodes[$-1] = this;
@@ -1279,6 +1303,7 @@ class XmlComment : XmlNode {
 	XmlComment cloneXmlComment(XmlComment comment)
 	{
 		_comment = comment._comment;
+		_parent = null;
 		_docroot = comment._docroot;
 		return this;
 	}
@@ -1287,6 +1312,7 @@ class XmlComment : XmlNode {
 	override void reset() {
 		// put back in the pool of available XmlComment nodes if possible
 		_comment = null;
+		_parent = null;
 		if (_docroot) {
 			_docroot.xmlCommentNodes.length = _docroot.xmlCommentNodes.length + 1;
 			_docroot.xmlCommentNodes[$-1] = this;
